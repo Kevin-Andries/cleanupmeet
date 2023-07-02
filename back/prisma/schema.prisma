@@ -1,0 +1,143 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["extendedWhereUnique"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Models
+
+model User {
+  id                    String                 @id @db.VarChar(128)
+  createdAt             DateTime               @default(now())
+  email                 String                 @unique @db.VarChar(255)
+  name                  String                 @db.VarChar(30)
+  username              String?                @unique @db.VarChar(20)
+  trashCollectedInKg    Int                    @default(0)
+  phoneNumber           String?                @unique @db.VarChar(50)
+  birthDate             DateTime?
+  pictureId             String?                @db.VarChar(41)
+  pictureURL            String?                @db.VarChar(1000)
+  description           String?                @db.Text()
+  displayEmail          Boolean                @default(false)
+  displayPhoneNumber    Boolean                @default(false)
+  displayBirthDate      Boolean                @default(false)
+  lastRequest           DateTime               @default(now())
+  isPublic              Boolean                @default(true)
+  isAdmin               Boolean                @default(false)
+  isDisabled            Boolean                @default(false)
+  createdEvents         Event[]
+  participationInEvents Participant[]
+  postedEventComments   EventComment[]
+  participationRequests ParticipationRequest[]
+  createdReports        Report[]               @relation("reporterUser")
+  reported              Report[]               @relation("reportedUser")
+  contactForm           ContactForm[]
+}
+
+model Event {
+  id                    String                 @id @default(uuid()) @db.VarChar(36)
+  authorId              String                 @db.VarChar(128)
+  name                  String                 @db.VarChar(50)
+  slug                  String                 @db.VarChar(100)
+  createdAt             DateTime               @default(now())
+  date                  DateTime
+  city                  String                 @db.VarChar(50)
+  address               String                 @db.VarChar(100)
+  coordinates           String                 @db.VarChar(50)
+  description           String                 @db.Text()
+  checklist             Json
+  trashCollectedInKg    Int?
+  acceptCoOrganizer     Boolean
+  isFinished            Boolean                @default(false)
+  isCancelled           Boolean                @default(false)
+  author                User                   @relation(fields: [authorId], references: [id])
+  participants          Participant[]
+  pictures              EventPicture[]
+  comments              EventComment[]
+  participationRequests ParticipationRequest[]
+
+  @@unique([id, slug])
+  @@index([slug])
+}
+
+model Participant {
+  eventId            String                   @db.VarChar(36)
+  slug               String                   @db.VarChar(100)
+  userId             String                   @db.VarChar(128)
+  type               EventParticipantTypeEnum
+  accompanyingPeople Int
+  joinedAt           DateTime                 @default(now())
+  event              Event                    @relation(fields: [eventId, slug], references: [id, slug])
+  user               User                     @relation(fields: [userId], references: [id])
+
+  @@id([userId, eventId])
+  @@index([userId, eventId, slug])
+}
+
+model EventPicture {
+  id            String  @id @db.VarChar(41)
+  url           String  @db.VarChar(1000)
+  eventId       String  @db.VarChar(36)
+  isMainPicture Boolean
+  event         Event   @relation(fields: [eventId], references: [id])
+
+  @@index([eventId])
+}
+
+model EventComment {
+  id        String   @id @default(uuid()) @db.VarChar(36)
+  eventId   String   @db.VarChar(36)
+  authorId  String   @db.VarChar(128)
+  createdAt DateTime @default(now())
+  comment   String   @db.Text()
+  event     Event    @relation(fields: [eventId], references: [id])
+  user      User     @relation(fields: [authorId], references: [id])
+}
+
+model ParticipationRequest {
+  id                 String                   @id @default(uuid()) @db.VarChar(36)
+  eventId            String                   @db.VarChar(36)
+  userId             String                   @db.VarChar(128)
+  createdAt          DateTime                 @default(now())
+  accompanyingPeople Int
+  message            String?                  @db.Text()
+  participantType    EventParticipantTypeEnum
+  displayPhoneNumber Boolean
+  acceptedAt         DateTime?
+  event              Event                    @relation(fields: [eventId], references: [id])
+  user               User                     @relation(fields: [userId], references: [id])
+
+  @@index([userId, eventId])
+}
+
+model Report {
+  id             String   @id @default(uuid()) @db.VarChar(36)
+  reporterUserId String   @db.VarChar(128)
+  reportedUserId String?  @db.VarChar(128)
+  eventId        String?  @db.VarChar(36)
+  message        String   @db.Text()
+  createdAt      DateTime @default(now())
+  isClosed       Boolean  @default(false)
+  reporterUser   User     @relation(name: "reporterUser", fields: [reporterUserId], references: [id])
+  reportedUser   User?    @relation(name: "reportedUser", fields: [reportedUserId], references: [id])
+}
+
+model ContactForm {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  authorId    String?  @db.VarChar(128)
+  authorEmail String?  @db.VarChar(255)
+  message     String   @db.Text()
+  createdAt   DateTime @default(now())
+  isAnswered  Boolean  @default(false)
+  author      User?    @relation(fields: [authorId], references: [id])
+}
+
+enum EventParticipantTypeEnum {
+  ORGANIZER
+  CO_ORGANIZER
+  PARTICIPANT
+}
